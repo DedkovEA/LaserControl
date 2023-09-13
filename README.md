@@ -3,6 +3,8 @@ Simple C++ program for control i2c VCSEL setup via FT4222H
 
 ## Installation
 1. Download FTDI D2XX driver. For example, from: https://ftdichip.com/drivers/d2xx-drivers/
+
+   Note that driver will be setup only after plugging in FTDI device (it also may be setup automatically, when plugging device). Until it you can get missing dll message.
 2. Download FTDI libraries: ftd2xx and LibFT4222. For example from: https://ftdichip.com/wp-content/uploads/2022/06/LibFT4222-v1.4.5.zip 
 3. Put them into project root folder. Folder structure should be:
 
