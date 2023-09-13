@@ -1,0 +1,2 @@
+#define LaserControl_VERSION_MAJOR @LaserControl_VERSION_MAJOR@
+#define LaserControl_VERSION_MINOR @LaserControl_VERSION_MINOR@
