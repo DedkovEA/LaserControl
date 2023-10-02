@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
 
-project(LaserControl VERSION 1.0)
+project(LaserControl VERSION 1.1)
 
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
@@ -40,6 +40,7 @@ add_executable(LaserControl
                 src/FtdiI2C.cpp
                 src/LaserControl.cpp
                 src/debuger.cpp
+                src/LTC5100Parameters.cpp
               )
 
 configure_file(include/config.h.in config.h)
@@ -71,7 +72,6 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 if(MINGW)
-    set(CMAKE_CXX_FLAGS "-Wall -Wextra")
     set(CMAKE_CXX_FLAGS_DEBUG "-g")
-    set(CMAKE_CXX_FLAGS_RELEASE "-O0")
+    set(CMAKE_CXX_FLAGS_RELEASE "-O2")
 endif()

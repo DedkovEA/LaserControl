@@ -5,6 +5,7 @@
 #include <FtdiI2C.hpp>
 #include "debuger.h"
 #include "config.h"
+#include "LTC5100Parameters.hpp"
 
 #include <string>
 #include <vector>
@@ -12,10 +13,6 @@
 #include <limits>
 
 
-// TODO : fix times and delays
-// Fix all warnings
-
-// using namespace std::chrono_literals;
 
 enum RETURN_STATUS {
     OK = 0,
@@ -64,10 +61,10 @@ void reprogram_EEPROM(FtdiI2C &i2c, uint8 eepromadr=0x50) {
 int main(int argc, char *argv[]) {
 
     int devnum = 0;                     // number of FTDI devices, no need to set it 
-    uint8 slaveAddress = 0x0A;        // address of LTC5100 laser diod driver
+    uint8 slaveAddress = 0x0A;          // address of LTC5100 laser diod driver
     int tries = 2;                      // number of tries to send command
     bool need_programm_eeprom = true;  
-    uint8 eepromadr = 0x50;           // address of EEPROM on common I2C bus
+    uint8 eepromadr = 0x50;             // address of EEPROM on common I2C bus
 
     std::cout << "===================\n";
     std::cout << "LaserControl v. " << LaserControl_VERSION_MAJOR << "." << LaserControl_VERSION_MINOR << "\n";
@@ -78,17 +75,30 @@ int main(int argc, char *argv[]) {
     try {
         FtdiI2C i2c(slaveAddress, devnum, tries);
 
+
+        LTC5100Parameters controllerParams;
+        std::vector<uint8> memory;
+        memory.resize(16, 0);
+        bool res = i2c.Read24LC00Sequential(eepromadr, 0x00, memory.data(), 16);
+        if (res) {
+            controllerParams.update_from_EEPROM(memory.data());
+        } else {
+            std::cout << "Something goes wrong, EEPROM was not properly read.";
+        }
+
         std::string input = "";
         while (true) {
             //std::cin >> input;
             std::getline(std::cin, input);
             if (input == "H" || input == "help" || input == "h") {
                 std::cout << "This program operates with VCSEL controlled by LTC5100 driver. Following commands are allowed:\n";
-                std::cout << "    H(help, h)       --- display this message;\n";
-                std::cout << "    SB(set bias, sb)  --- enter set bias current mode,\n";
-                std::cout << "                      in order to exit - send \'E\';\n";
-                std::cout << "    R(reprogram, r)  --- repogram EEPROM;\n";
-                std::cout << "    E(exit, e)    --- exit program.\n";
+                std::cout << "    H(help, h)                --- display this message;\n";
+                std::cout << "    SB(set bias, sb)          --- enter set bias current mode,\n";
+                std::cout << "                                  in order to exit - send \'E\';\n";
+                std::cout << "    R(reprogram, r)           --- repogram EEPROM;\n";
+                std::cout << "    S(status, s)              --- enter status menu;\n";
+                std::cout << "    DW(direct write, dw)      --- write into LTC5100 directy;\n";
+                std::cout << "    E(exit, e)                --- exit program.\n";
             } else if (input == "R" || input == "reprogram" || input == "r") {
                 reprogram_EEPROM(i2c, eepromadr);
             } else if (input == "SB" || input == "set bias" || input == "sb") {
@@ -178,6 +188,62 @@ int main(int argc, char *argv[]) {
                     }
                 }
 
+            } else if (input == "S" || input == "status" || input == "s") {
+                std::cout << "Choose action on status:\n";
+                std::cout << "   ed --- EEPROM dump;\n";
+                std::cout << "   cd --- LTC5100 controller dump;\n";
+                std::cout << "   s  --- Show current status;\n";
+                std::cout << "   w  --- Write current status into EEPROM;\n";
+                std::getline(std::cin, input);
+                if(input == "ed" || input == "eeprom dump" || input == "ED") {
+                    std::vector<uint8> memory;
+                    memory.resize(16, 0);
+                    bool res = i2c.Read24LC00Sequential(eepromadr, 0x00, memory.data(), 16);
+                    if (res) {
+                        controllerParams.update_from_EEPROM(memory.data());
+                        controllerParams.pretty_print();
+                    } else {
+                        std::cout << "Something goes wrong, EEPROM was not properly read.";
+                    }
+                } else if (input == "cd" || input == "controller dump" || input == "CD") {
+                    controllerParams.update_from_controller(&i2c);
+                    controllerParams.pretty_print(true);
+                } else if (input == "s" || input == "show" || input == "S") {
+                    controllerParams.pretty_print(true);
+                } else if (input == "w" || input == "write" || input == "W") {
+                    controllerParams.write_to_EEPROM(&i2c, eepromadr);
+                } else {
+                    std::cout << "Invalid action. Choose from actions listed above.\n";
+                };
+            } else if (input == "DW" || input == "direct write" || input == "dw") {
+                std::cout << "You invoke direct write into LTC5100 controller. You are acting at your own\'s risk.\n";
+                std::cout << "Usage:\n";
+                std::cout << "   <LTC command in hex> <2 bytes to write in hex>\n";
+                
+                uint8_t command;
+                uint16_t data;
+                std::string write_input;
+                std::getline(std::cin, write_input);
+
+                int delimpos = write_input.find(' ');
+                if (delimpos == std::string::npos) {
+                    std::cout << "Invalid arguments. Allowed usage are:\n";
+                    std::cout << "   <LTC command in hex> <2 bytes to write in hex>\n";
+                    continue;
+                }
+                try {
+                    command = std::stoul(write_input.substr(0, delimpos), nullptr, 16);
+                    data = std::stoul(write_input.substr(delimpos+1), nullptr, 16);
+                } catch (const std::invalid_argument &e) {
+                    std::cout << "Invalid argument! Error in interpreting values:\n";
+                    std::cout << "    " << e.what() << "\n";
+                    continue;
+                }
+
+                std::cout << std::hex << command << "\n";
+                std::cout << std::hex << data << "\n";
+                print_debug_info("Writing command = " + std::to_string(command) + ", data = " + std::to_string(data) + "\n");
+                i2c.WriteLTCRegister16b(command, data);
             } else if (input == "E" || input == "exit" || input == "e") {
                 std::cout << "Exit from program";
                 i2c.WriteLTCRegister16b(0x15, 0x00);

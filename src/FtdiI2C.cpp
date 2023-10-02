@@ -252,7 +252,6 @@ uint8 status;
         print_debug_info("Try to send command on 24LC00 EEPROM\n");
         ret = WriteEx(deviceadr, FLAG_START, &address, sizeof(address), transferred);
         if ((ret == FT4222_OK) && (transferred == sizeof(address))) {
-            GetStatus(status);
             ret = GetStatus(status);
             print_debug_info("Try to recieve data from 24LC00 EEPROM\n");
             if (!((ret != FT4222_OK) || I2CM_ADDRESS_NACK(status) || I2CM_DATA_NACK(status))) {
@@ -277,4 +276,40 @@ uint8 status;
         throw EEPROMException("Cannot read register");
 
     return read_value;
+}
+
+bool FtdiI2C::Read24LC00Sequential(uint8 deviceadr, uint8 address, uint8* buffer, uint8 readsize) {
+int tries = m_iTries;
+FT4222_STATUS ret;
+uint16 transferred;
+uint8 status;
+
+    while (tries > 0) {
+        print_debug_info("Try to send command on 24LC00 EEPROM\n");
+        ret = WriteEx(deviceadr, FLAG_START, &address, sizeof(address), transferred);
+        if ((ret == FT4222_OK) && (transferred == sizeof(address))) {
+            ret = GetStatus(status);
+            print_debug_info("Try to recieve data from 24LC00 EEPROM\n");
+            if (!((ret != FT4222_OK) || I2CM_ADDRESS_NACK(status) || I2CM_DATA_NACK(status))) {
+                ret = ReadEx(deviceadr, FLAG_START_AND_STOP, buffer, readsize, transferred);
+                if ((ret == FT4222_OK) && (transferred == readsize)) {
+                    GetStatus(status);
+                    if (!(I2CM_DATA_NACK(status) || I2CM_ADDRESS_NACK(status) || I2CM_ARB_LOST(status) || I2CM_BUS_BUSY(status) || I2CM_CONTROLLER_BUSY(status))) {
+                        print_debug_info("Data sucessfully recieved\n");
+                        break;
+                    }
+                }
+            }
+        }
+        if (tries > 0) {
+            Reset();
+            tries--;
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            continue;
+        }
+    }
+    if (tries == 0)
+        throw EEPROMException("Cannot read register");
+
+    return true;
 }

@@ -31,6 +31,7 @@ public:
     bool Write24LC00Register8b(uint8 deviceadr, uint8 address, uint8 data);
     uint16 ReadLTCRegister16b(uint8 address);
     uint8 Read24LC00Register8b(uint8 deviceadr, uint8 address);
+    bool Read24LC00Sequential(uint8 deviceadr, uint8 address, uint8* buffer, uint8 readsize);
 
     bool WaitBusy(uint8 &status, int timeout = 20);
 
